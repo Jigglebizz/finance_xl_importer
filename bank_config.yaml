@@ -1,0 +1,48 @@
+Truist:
+  Headers: # Headers are used to identify the CSV as associated with a particular bank. Order matters
+    - Posted Date
+    - Transaction Date
+    - Transaction Type
+    - 'Check/Serial #'
+    - Description
+    - Amount
+    - Daily Posted Balance
+  AmountHeader: # Which header says how much an item cost
+    Amount
+  DateHeader:   # Which header says when the transaction occurred
+    Posted Date
+  DateFormat:
+    '%m/%d/%Y'
+  NameHeader:   # Which header we pull the name of the transaction from
+    Description
+  DateBegin:    # If available, infer the statement's begin date from this pattern in the filename
+    Match:
+      acct_\d{4}_(\d\d_\d\d_\d{4}).* # where to extract the date from the filename from (in parens)
+    Fmt:
+      '%m_%d_%Y' # the format of that date
+  DateEnd:       # If available, infer the statement's end date from this pattern in the filename
+    Match:
+      acct_\d{4}_\d\d_\d\d_\d{4}_to_(\d\d_\d\d_\d{4}).*
+    Fmt:
+      '%m_%d_%Y'
+  AccountId:    # If available, infer the statement's account ID from this pattern in the filename
+    acct_(\d{4}).*
+  
+Discover:
+  Headers:
+    - Trans. Date
+    - Post Date
+    - Description
+    - Amount
+    - Category
+  AmountHeader:
+    Amount
+  DateHeader:
+    Post Date
+  NameHeader:
+    Description
+  DateEnd:
+    Match:
+      Discover-Statement-(\d{8}).csv
+    Fmt:
+      '%Y%m%d'
