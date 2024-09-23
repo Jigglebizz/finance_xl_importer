@@ -16,7 +16,10 @@ class Categorizer:
     with open( path_to_config, 'r' ) as config_file:
       config_yaml = yaml.safe_load( config_file )
       for category in config_yaml.keys():
-        self.categories[ category ] = [ re.compile( pattern ) for pattern in config_yaml[ category ] ]
+        if config_yaml[ category ] is not None:
+          self.categories[ category ] = [ re.compile( pattern ) for pattern in config_yaml[ category ] ]
+        else:
+          self.categories[ category ] = []
 
   def GetCategoryForName( self, name : str ) -> str:
     for cat, patterns in self.categories.items():
@@ -26,47 +29,65 @@ class Categorizer:
         
     return 'Unknown'
 
+class Account:
+  bank : Bank
+  id   : int
+  
+  def __init__( self, bank : Bank, id : int = -1 ) -> None:
+    self.bank = bank
+    self.id   = id
+
+  def __repr__( self ) -> str:
+    acct_id_spec = f' {self.id}' if self.id != -1 else ''
+    return f'{self.bank.name}{acct_id_spec}'
+
 #------------------------------------------------------------------------------------------------
 class Transaction:
   name             : str
   amount           : USD
   date             : datetime
   category         : str
+  account          : Account
   matched_transfer : bool
 
-  def __init__( self, name : str, amount : USD, date : datetime, category : str ):
+  def __init__( self, name : str, amount : USD, account : Account, date : datetime, category : str ):
     self.name             = name
     self.amount           = amount
+    self.account          = account
     self.date             = date
     self.category         = category
     self.matched_transfer = False
 
   def __repr__( self ) -> str:
-    return f'{self.name}: {self.amount} on {self.date}'
+    return f'{str(self.account)} : {self.amount} on {self.date}, {self.name}'
 
 #------------------------------------------------------------------------------------------------
 class Statement:
-  bank         : Bank
+  account      : Account
   start_date   : datetime
   end_date     : datetime
-  account_id   : int
   transactions : List[Transaction]
   
   def __init__( self, bank : Bank ):
-    self.bank         = bank
+    self.account      = Account( bank )
     self.transactions = []
     self.start_date   = None
     self.end_date     = None
-    self.account_id   = -1
 
   def __repr__( self ) -> str:
-    acct_str = f'acct {self.account_id} ' if self.account_id != -1 else ''
-    return f'Statement for {self.bank.name} {acct_str}from {self.start_date} to {self.end_date}:\n  ' + '\n  '.join( [ str(t) for t in self.transactions] )
+    return f'Statement for {str(self.account)} from {self.start_date} to {self.end_date}:\n  ' + '\n  '.join( [ str(t) for t in self.transactions] )
   
   def Read( self, statement_path : str, bank_info : BankInfo, categorizer : Categorizer ) -> None:
     file_basename = os.path.basename( statement_path )
 
     with open( statement_path, 'r' ) as statement_file:
+
+      # get account info
+      if bank_info.account_id_pattern is not None:
+        m = re.match( bank_info.account_id_pattern, file_basename )
+        if m is not None:
+          self.account.id = int( m.group(1) )
+
       statement_csv = csv.reader( statement_file )
 
       next( statement_csv ) # skip the header
@@ -75,7 +96,7 @@ class Statement:
         date   = datetime.strptime( row[ bank_info.date_idx ], bank_info.date_fmt )
         name   = row[ bank_info.name_idx ]
         category = categorizer.GetCategoryForName( name )
-        transaction = Transaction( name, amount, date, category )
+        transaction = Transaction( name, amount, self.account, date, category )
         self.transactions.append( transaction )
 
         if self.start_date is None or self.start_date > date:
@@ -94,11 +115,6 @@ class Statement:
         inferred_date = bank_info.date_end_pattern.Match( file_basename, 'end date', bank_info.bank.name )
         if inferred_date is not None:
           self.end_date = inferred_date
-
-      if bank_info.account_id_pattern is not None:
-        m = re.match( bank_info.account_id_pattern, file_basename )
-        if m is not None:
-          self.account_id = int( m.group(1) )
 
   def ResolveTransfers( self, statements ) -> None:
     for tx in [ tx for tx in self.transactions if tx.category == 'Transfer' ]:

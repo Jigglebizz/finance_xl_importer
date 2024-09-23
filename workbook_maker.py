@@ -2,6 +2,8 @@ import math
 import openpyxl
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from typing import List
+import copy
+import pdb
 from statement import Statement, Categorizer
 
 #------------------------------------------------------------------------------------------------
@@ -31,8 +33,57 @@ class ExcelColumn:
     i_rep += num
     return ExcelColumn( self.IntToName( i_rep ) )
   
+  def __sub__( self, num : int ):
+    i_rep = self.NameToInt( self.name )
+    i_rep -= num
+    return ExcelColumn( self.IntToName( i_rep ) )
+  
+  def __gt__( self, other ) -> bool:
+    return self.NameToInt( self.name ) > other.NameToInt( other.name )
+
   def __repr__( self ) -> str:
     return self.name
+  
+#------------------------------------------------------------------------------------------------
+class ExcelCell:
+  col : ExcelColumn
+  row : int
+
+  def __init__( self, col : ExcelColumn, row : int ) -> None:
+    self.col = col
+    self.row = row
+
+  def inc_col( self ):
+    ret = ExcelCell( copy.deepcopy( self.col ), self.row )
+    self.col += 1
+    return ret
+
+  def __repr__( self ) -> str:
+    return f'{str(self.col)}{self.row}'
+  
+
+#------------------------------------------------------------------------------------------------
+class ExcelCursor:
+  cell_cursor : ExcelCell
+  cell_begin  : ExcelCell
+  width       : int
+
+  def __init__( self, cell : ExcelCell, width : int ) -> None:
+    self.cell_begin  = copy.deepcopy( cell )
+    self.cell_cursor = copy.deepcopy( cell )
+    self.width       = width
+  
+  def inc( self ) -> ExcelCell:
+    ret_cell = copy.deepcopy( self.cell_cursor )
+  
+    cell_end : ExcelCell = ExcelCell( self.cell_begin.col + self.width - 1, self.cell_cursor.row )
+    self.cell_cursor.col += 1
+    if self.cell_cursor.col > cell_end.col:
+      self.cell_cursor.col = copy.deepcopy( self.cell_begin.col )
+      self.cell_cursor.row += 1
+  
+    return ret_cell
+
 
 #------------------------------------------------------------------------------------------------
 class WorkbookMaker:
@@ -53,101 +104,106 @@ class WorkbookMaker:
     end_date_str   = max_end_date.strftime( '%b%d %Y')
 
     worksheet_name = f'{ start_date_str }-{ end_date_str }'
-    print( worksheet_name )
     if worksheet_name in self.workbook.sheetnames:
       self.workbook.remove( self.workbook[ worksheet_name ] )
 
     sheet = self.workbook.create_sheet( worksheet_name )
-    row = 1
-    data_ranges = []
-    for stmt in new_statements:
-      account_name : str = stmt.bank.name + (' ' + str(stmt.account_id) if stmt.account_id != -1 else '')
-      sheet[ f'A{row}' ] = account_name
-      statement_start = row
-      row += 1
-      sheet[ f'A{row}' ] = 'Date'
-      sheet[ f'B{row}' ] = 'Amount'
-      sheet[ f'C{row}' ] = 'Description'
-      sheet[ f'D{row}' ] = 'Category'
-      sheet[ f'E{row}' ] = 'Include in Cash Flow'
-      sheet[ f'F{row}' ] = 'Matched Transfer'
-      data_start = row
-      row += 1 
-      for tx in stmt.transactions:
-        sheet[ f'A{row}' ] = tx.date.strftime( '%m/%d/%Y' )
-        sheet[ f'B{row}' ] = float(tx.amount.AsExcel())
-        sheet[ f'B{row}' ].number_format = "$0.00"
-        sheet[ f'C{row}' ] = tx.name
-        sheet[ f'D{row}' ] = tx.category
-        sheet[ f'E{row}' ] = 'TRUE'
-        sheet[ f'F{row}' ] = 'TRUE' if tx.matched_transfer else 'FALSE'
-        row += 1
+    simpl_name = worksheet_name.replace(' ', '').replace('-','_')
 
-      data_end = row - 1
-      data_ranges.append( ( data_start, data_end ) )
-      row += 1
+    transaction_table_name = f'{simpl_name}_tx'
+    cell_cursor : ExcelCell = self.MakeSummaryTable( name          = f'{simpl_name}_summary',
+                                                     start_cell    = ExcelCell( ExcelColumn( 'A'), 1 ),
+                                                     sheet         = sheet,
+                                                     tx_table_name = transaction_table_name, 
+                                                     statements    = new_statements,
+                                                     categorizer   = categorizer )
+    cell_cursor.col += 2
+    cell_cursor.row  = 1
 
-      stmt_table  = Table( displayName=account_name.replace(' ', ''), ref=f'A{data_start}:F{data_end}' )
-      table_style = TableStyleInfo( name='TableStyleMedium9', showRowStripes=True )
-      stmt_table.tableStyleInfo = table_style
-      sheet.add_table( stmt_table )
+    cell_cursor = self.MakeTransactionTable( name          = transaction_table_name, 
+                                             start_cell    = cell_cursor,
+                                             sheet         = sheet, 
+                                             statements    = new_statements )
 
-      # now create summary info
-      summary_row = statement_start
-      sheet[ f'H{summary_row}' ] = 'Summary'
-      sheet[ f'M{summary_row}' ] = 'By Category'
-      summary_row += 1
-      sheet[ f'H{summary_row}' ] = 'Expenses'
-      sheet[ f'I{summary_row}' ] = 'Income'
-      sheet[ f'J{summary_row}' ] = 'Total'
-      sheet[ f'K{summary_row}' ] = 'Cash Flow'
+  #------------------------------------------------------------------------------------------------
+  # returns the bottom right cell
+  def MakeTransactionTable( self, name: str, start_cell: ExcelCell, sheet : openpyxl.worksheet.worksheet, statements : List[ Statement ] ) -> ExcelCell:
+    all_tx = [ tx for stmt in statements for tx in stmt.transactions  ]
+    all_tx.sort( key=lambda x : x.date, reverse=True)
 
-      col = ExcelColumn( 'M' )
-      for cat in categorizer.categories.keys():
-        sheet[ f'{str(col)}{summary_row}'] = cat
-        col += 1
-      sheet[ f'{str(col)}{summary_row}' ] = 'Unknown'
+    sheet[ str( start_cell ) ] = 'Transactions'
+    start_cell.row += 1
+    cursor : ExcelCursor = ExcelCursor( start_cell, 6 )
 
-      summary_row += 1
-      sheet[ f'H{summary_row}' ] = f'=-SUMIFS($B{data_start}:$B{data_end},$B{data_start}:$B{data_end},"<0",$F{data_start}:$F{data_end},"*FALSE*")'
-      sheet[ f'I{summary_row}' ] = f'=SUMIFS($B{data_start}:$B{data_end},$B{data_start}:$B{data_end},">0",$F{data_start}:$F{data_end},"*FALSE*")'
-      sheet[ f'J{summary_row}' ] = f'=SUMIFS($B{data_start}:$B{data_end},$F{data_start}:$F{data_end},"*FALSE*")'
-      sheet[ f'K{summary_row}' ] = f'=SUMIFS($B{data_start}:$B{data_end},$E{data_start}:$E{data_end},"*TRUE*",$F{data_start}:$F{data_end},"*FALSE*")'
+    table_start = start_cell
+    table_end   = None
 
-      col = ExcelColumn( 'L' )
-      for cat in categorizer.categories.keys():
-        sheet[ f'{str(col)}{summary_row}' ] = f'=ABS(SUMIFS($B{data_start}:$B{data_end},$D{data_start}:$D{data_end},"*{cat}*"))'
-        col += 1
-      sheet[ f'{str(col)}{summary_row}' ] = f'=ABS(SUMIFS($B{data_start}:$B{data_end},$D{data_start}:$D{data_end},"*Unknown*"))'
+    sheet[ str( cursor.inc() ) ] = 'Date'
+    sheet[ str( cursor.inc() ) ] = 'Amount'
+    sheet[ str( cursor.inc() ) ] = 'Account'
+    sheet[ str( cursor.inc() ) ] = 'Description'
+    sheet[ str( cursor.inc() ) ] = 'Category'
+    sheet[ str( cursor.inc() ) ] = 'Matched Transfer'
+    for tx in all_tx:
+      sheet[ str( cursor.inc() ) ] = tx.date.strftime( '%m/%d/%Y' )
 
-    # and total summary
-    summary_start = row
-    sheet[ f'A{row}' ] = 'Category'
-    sheet[ f'B{row}' ] = 'Amount'
-    row += 1
-    sheet[ f'A{row}' ] = 'Expenses'
-    sheet[ f'B{row}' ] = '=-(' + ' + '.join([ f'SUMIFS(B{data_start}:B{data_end},B{data_start}:B{data_end},"<0",F{data_start}:F{data_end},"*FALSE*")' for data_start, data_end in data_ranges ]) + ')'
-    row += 1
-    sheet[ f'A{row}' ] = 'Income'
-    sheet[ f'B{row}' ] = '=' + ' + '.join([ f'SUMIFS(B{data_start}:B{data_end},B{data_start}:B{data_end},">0",F{data_start}:F{data_end},"*FALSE*")' for data_start, data_end in data_ranges ])
-    row += 1
-    sheet[ f'A{row}' ] = 'Total'
-    sheet[ f'B{row}' ] = '=' + ' + '.join([ f'SUMIFS(B{data_start}:B{data_end},F{data_start}:F{data_end},"*FALSE*")' for data_start, data_end in data_ranges ])
-    row += 1
-    sheet[ f'A{row}' ] = 'Cash Flow'
-    sheet[ f'B{row}' ] = '=' + ' + '.join([ f'SUMIFS(B{data_start}:B{data_end},E{data_start}:E{data_end},"*TRUE*")' for data_start, data_end in data_ranges ])
-    row += 1
+      amt_cell = cursor.inc()
+      sheet[ str( amt_cell ) ] = float(tx.amount.AsExcel())
+      sheet[ str( amt_cell ) ].number_format = "$0.00"
 
-    for cat in categorizer.categories.keys():
-      sheet[ f'A{row}' ] = cat
-      sheet[ f'B{row}' ] = '=ABS(' + ' + '.join( [ f'SUMIFS($B{data_start}:$B{data_end},$D{data_start}:$D{data_end},"*{cat}*")' for data_start, data_end in data_ranges ] ) + ')'
-      row += 1
-    
-    sheet[ f'A{row}' ] = 'Unknown'
-    sheet[ f'B{row}' ] = '=ABS(' + ' + '.join( [ f'SUMIFS($B{data_start}:$B{data_end},$D{data_start}:$D{data_end},"*UNKNOWN*")' for data_start, data_end in data_ranges ] ) + ')'
-    
-    summary_end = row
-    summary_table  = Table( displayName='Summary', ref=f'A{summary_start}:B{summary_end}' )
+      sheet[ str( cursor.inc() ) ] = str( tx.account )
+      sheet[ str( cursor.inc() ) ] = tx.name
+      sheet[ str( cursor.inc() ) ] = tx.category
+
+      table_end = cursor.inc()
+      sheet[ str( table_end ) ] = 'TRUE' if tx.matched_transfer else 'FALSE'
+
+    stmt_table  = Table( displayName=name, ref=f'{str( table_start ) }:{ str( table_end ) }' )
     table_style = TableStyleInfo( name='TableStyleMedium9', showRowStripes=True )
-    summary_table.tableStyleInfo = table_style
-    sheet.add_table( summary_table )
+    stmt_table.tableStyleInfo = table_style
+    sheet.add_table( stmt_table )
+  
+  #------------------------------------------------------------------------------------------------
+  # returns the bottom right cell
+  def MakeSummaryTable( self, name : str, start_cell : ExcelCell, sheet : openpyxl.worksheet.worksheet, tx_table_name : str, statements : List[ Statement ], categorizer : Categorizer ) -> ExcelCell:
+    sheet[ str( start_cell ) ] = 'Summary'
+    cell = copy.deepcopy( start_cell )
+    cell.row += 1
+
+    table_start = cell
+    table_end   = None
+    cursor = ExcelCursor( cell, len( statements ) + 2 )
+
+    sheet[ str( cursor.inc() ) ] = 'Category'
+    sheet[ str( cursor.inc() ) ] = 'Totals'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = str( stmt.account )
+    
+    sheet[ str( cursor.inc() ) ] = 'Expenses'
+    sheet[ str( cursor.inc() ) ] = f'=-SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Matched Transfer], "*FALSE*")'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = f'=-SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Account], "*{str(stmt.account)}*")'
+
+    sheet[ str( cursor.inc() ) ] = 'Total Revenue'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Matched Transfer], "*FALSE*")'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Account], "*{str(stmt.account)}*")'
+
+    sheet[ str( cursor.inc() ) ] = 'Cash Flow'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Matched Transfer], "*FALSE*", {tx_table_name}[Category], "<>*Loans*" )'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Account], "*{str(stmt.account)}*")'
+
+    for cat in categorizer.categories:
+      sheet[ str( cursor.inc() ) ] = cat
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS( {tx_table_name}[Amount], {tx_table_name}[Category], "*{cat}*" )'
+      for stmt in statements:
+        table_end = cursor.inc()
+        sheet[ str( table_end ) ] = f'=SUMIFS( {tx_table_name}[Amount], {tx_table_name}[Category], "*{cat}*", {tx_table_name}[Account], "*{str(stmt.account)}*" )'
+
+    stmt_table  = Table( displayName=name, ref=f'{str( table_start ) }:{ str( table_end ) }' )
+    table_style = TableStyleInfo( name='TableStyleMedium9', showRowStripes=True )
+    stmt_table.tableStyleInfo = table_style
+    sheet.add_table( stmt_table )
+
+    return table_end
