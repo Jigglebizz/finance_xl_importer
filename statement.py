@@ -16,7 +16,10 @@ class Categorizer:
     with open( path_to_config, 'r' ) as config_file:
       config_yaml = yaml.safe_load( config_file )
       for category in config_yaml.keys():
-        self.categories[ category ] = [ re.compile( pattern ) for pattern in config_yaml[ category ] ]
+        if config_yaml[ category ] is not None:
+          self.categories[ category ] = [ re.compile( pattern ) for pattern in config_yaml[ category ] ]
+        else:
+          self.categories[ category ] = []
 
   def GetCategoryForName( self, name : str ) -> str:
     for cat, patterns in self.categories.items():

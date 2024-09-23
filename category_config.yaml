@@ -1,4 +1,10 @@
-Bill:
+Income:
+  - DIRECT DEP SONY
+
+Revenue:
+  - MOBILE DEPOSIT
+
+Utilities:
   - DUKEENERGY
   - DOMINION ENERGY
   - UTIL PAYMT
@@ -6,33 +12,6 @@ Bill:
   - WAKE PRO LAWN CARE
   - SPECTRUM
   - PIEDMONT ELECTRIC
-
-Entertainment:
-  - DISNEY PLUS
-  - YOUTUBEINTERNET
-  - NINTENDO INTERNATIONAL
-  - SPOTIFYUSA
-  - CRUNCHYROLL
-  - NETFLIX.COM
-  - PATREON
-  - MOTORCOMUSIC.COM
-
-Hobbies:
-  - HANGAR 18
-
-Tools:
-  - GITHUB
-
-Auto:
-  - CIRCLE K
-  - REFUEL
-
-Home:
-  - WESTLAKE HARDWARE
-  - LOWE'S OF PITTSBORO
-  - CABINETPART
-  - T\&C \- CHATHAM DOWNS
-  - WAYFAIR
 
 Restaurants:
   - CARRBURRITOS
@@ -55,15 +34,45 @@ Groceries:
   - HARRIS TEETER
   - LOWES FOODS
 
+Subscriptions:
+  - GITHUB
+
+Entertainment Subscriptions:
+  - DISNEY PLUS
+  - YOUTUBEINTERNET
+  - SPOTIFYUSA
+  - CRUNCHYROLL
+  - NETFLIX.COM
+  - PATREON
+
+Entertainment:
+  - NINTENDO INTERNATIONAL
+  - MOTORCOMUSIC.COM
+
+Hobbies:
+  - HANGAR 18
+
+Gas:
+  - CIRCLE K
+  - REFUEL
+
+Car Expenses:
+  ~
+
+Home Repairs:
+  - WESTLAKE HARDWARE
+  - LOWE'S OF PITTSBORO
+  - CABINETPART
+  - T\&C \- CHATHAM DOWNS
+
+Home Improvement:
+  - WAYFAIR
+
 Pets:
   - KINDRED HEART
 
 Medical:
   - DERMATOLOGY
-
-Income:
-  - DIRECT DEP SONY
-  - MOBILE DEPOSIT
 
 Shopping:
   - AMAZON MKTPL
@@ -76,3 +85,12 @@ Transfer:
   - TRUIST ONLINE TRANSFER
   - TRUIST DEPOSIT TRANSFER
   - E\-PAYMENT DISCOVER
+
+Big Purchases:
+  ~
+
+Gifts:
+  ~
+
+Loans:
+  ~
