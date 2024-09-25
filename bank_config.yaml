@@ -1,4 +1,5 @@
 Truist:
+  Type: Bank
   Headers: # Headers are used to identify the CSV as associated with a particular bank. Order matters
     - Posted Date
     - Transaction Date
@@ -29,6 +30,7 @@ Truist:
     acct_(\d{4}).*
   
 Discover:
+  Type: Credit Card
   Headers:
     - Trans. Date
     - Post Date
@@ -46,3 +48,13 @@ Discover:
       Discover-Statement-(\d{8}).csv
     Fmt:
       '%Y%m%d'
+
+PersonalLoan:
+  Type: Credit Card
+  Headers:
+    - Date
+    - Name
+    - Amount
+  AmountHeader: Amount
+  DateHeader: Date
+  NameHeader: Name

@@ -13,10 +13,10 @@ Utilities:
   - SPECTRUM
   - PIEDMONT ELECTRIC
 
-Restaurants:
+Food Restaurants:
   - CARRBURRITOS
   - TACO BELL
-  - CHIK\-FIL\-A
+  - CHICK\-FIL\-A
   - TENKO JAPAN
   - AMANTEGOURMET
   - FIREHOUSE SUBS
@@ -26,16 +26,23 @@ Restaurants:
   - TA CONTENTO
   - CARRBORO CARRBORO
 
-Alcohol & Bars:
+Food Alcohol & Bars:
   - TST\* MOTORCO
 
-Groceries:
+Food Groceries:
   - WEGMANS
   - HARRIS TEETER
   - LOWES FOODS
 
+Food:
+  ~
+
 Subscriptions:
   - GITHUB
+
+Entertainment:
+  - NINTENDO INTERNATIONAL
+  - MOTORCOMUSIC.COM
 
 Entertainment Subscriptions:
   - DISNEY PLUS
@@ -44,10 +51,6 @@ Entertainment Subscriptions:
   - CRUNCHYROLL
   - NETFLIX.COM
   - PATREON
-
-Entertainment:
-  - NINTENDO INTERNATIONAL
-  - MOTORCOMUSIC.COM
 
 Hobbies:
   - HANGAR 18
@@ -59,11 +62,18 @@ Gas:
 Car Expenses:
   ~
 
+Home Maintenance:
+  - Jose Garcia
+  - Joel Lloyd
+
 Home Repairs:
   - WESTLAKE HARDWARE
   - LOWE'S OF PITTSBORO
   - CABINETPART
   - T\&C \- CHATHAM DOWNS
+
+Home:
+  ~
 
 Home Improvement:
   - WAYFAIR
@@ -84,7 +94,11 @@ Retirement:
 Transfer:
   - TRUIST ONLINE TRANSFER
   - TRUIST DEPOSIT TRANSFER
+  
+
+Credit Card Payment:
   - E\-PAYMENT DISCOVER
+  - DIRECTPAY FULL BALANCE
 
 Big Purchases:
   ~
