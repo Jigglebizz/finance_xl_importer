@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Optional, List, Pattern, Dict
 from colorama import Fore, Style
 from datetime import datetime
+import yaml
 import re
 
 #------------------------------------------------------------------------------------------------
@@ -9,7 +10,16 @@ Bank = Enum(
   'Bank',
   [
     'Truist',
-    'Discover'
+    'Discover',
+    'PersonalLoan'
+  ]
+)
+
+BankType = Enum(
+  'BankType',
+  [
+    'Bank',
+    'CreditCard'
   ]
 )
 
@@ -34,6 +44,7 @@ class DateMatch:
 #------------------------------------------------------------------------------------------------
 class BankInfo:
   bank               : Bank
+  type               : BankType
   headers            : List[str]
   amount_idx         : int
   date_idx           : int
@@ -45,6 +56,7 @@ class BankInfo:
 
   def __init__( self, bank : Bank ) -> None:
     self.bank               = bank
+    self.type               = BankType.Bank
     self.headers            = []
     self.amount_idx         = -1
     self.date_idx           = -1
@@ -61,6 +73,12 @@ class BankInfo:
 
       if 'Headers' in bank_info_yaml.keys():
         self.headers = bank_info_yaml[ 'Headers' ]
+
+      if 'Type' in bank_info_yaml.keys():
+        for t in BankType:
+          if t.name == bank_info_yaml[ 'Type' ].replace( ' ', '' ):
+            self.type = t
+            break
 
       if 'AmountHeader' in bank_info_yaml.keys():
         self.amount_idx = self.headers.index( bank_info_yaml[ 'AmountHeader' ] )
@@ -84,3 +102,26 @@ class BankInfo:
 
       if 'AccountId' in bank_info_yaml.keys():
         self.account_id_pattern = re.compile( bank_info_yaml[ 'AccountId' ] )
+
+
+class BankManager:
+  banks: Dict[ Bank, BankInfo ]
+
+  def __init__( self, bank_config_abs_path : str ) -> None:
+    self.banks = {}
+
+    with open( bank_config_abs_path, 'r' ) as bank_file:
+      bank_yaml = yaml.safe_load( bank_file )
+
+      for bank in Bank:
+        new_bank = BankInfo( bank )
+        new_bank.ReadFromYaml( bank_yaml )
+        self.banks[ bank ] = new_bank
+
+  def IdentifyStatement( self, csv_path : str ) -> Optional[BankInfo]:
+    with open( csv_path, 'r' ) as csv:
+      header = csv.readline()
+      for bank, bank_info in self.banks.items():
+        if ','.join(bank_info.headers) == header.strip():
+          return self.banks[ bank ]
+    return None

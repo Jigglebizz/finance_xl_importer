@@ -5,6 +5,7 @@ from typing import List
 import copy
 import pdb
 from statement import Statement, Categorizer
+from bank import BankInfo, BankType
 
 #------------------------------------------------------------------------------------------------
 class ExcelColumn:
@@ -133,7 +134,7 @@ class WorkbookMaker:
 
     sheet[ str( start_cell ) ] = 'Transactions'
     start_cell.row += 1
-    cursor : ExcelCursor = ExcelCursor( start_cell, 6 )
+    cursor : ExcelCursor = ExcelCursor( start_cell, 8 )
 
     table_start = start_cell
     table_end   = None
@@ -141,9 +142,11 @@ class WorkbookMaker:
     sheet[ str( cursor.inc() ) ] = 'Date'
     sheet[ str( cursor.inc() ) ] = 'Amount'
     sheet[ str( cursor.inc() ) ] = 'Account'
+    sheet[ str( cursor.inc() ) ] = 'Account Type'
     sheet[ str( cursor.inc() ) ] = 'Description'
     sheet[ str( cursor.inc() ) ] = 'Category'
     sheet[ str( cursor.inc() ) ] = 'Matched Transfer'
+    sheet[ str( cursor.inc() ) ] = 'Is Debt'
     for tx in all_tx:
       sheet[ str( cursor.inc() ) ] = tx.date.strftime( '%m/%d/%Y' )
 
@@ -152,11 +155,13 @@ class WorkbookMaker:
       sheet[ str( amt_cell ) ].number_format = "$0.00"
 
       sheet[ str( cursor.inc() ) ] = str( tx.account )
+      sheet[ str( cursor.inc() ) ] = str( tx.account.bank_info.type.name )
       sheet[ str( cursor.inc() ) ] = tx.name
       sheet[ str( cursor.inc() ) ] = tx.category
 
+      sheet[ str( cursor.inc() ) ] = 'TRUE' if tx.matched_transfer else 'FALSE'
       table_end = cursor.inc()
-      sheet[ str( table_end ) ] = 'TRUE' if tx.matched_transfer else 'FALSE'
+      sheet[ str( table_end ) ] = 'TRUE' if tx.is_debt else 'FALSE'
 
     stmt_table  = Table( displayName=name, ref=f'{str( table_start ) }:{ str( table_end ) }' )
     table_style = TableStyleInfo( name='TableStyleMedium9', showRowStripes=True )
@@ -178,21 +183,31 @@ class WorkbookMaker:
     sheet[ str( cursor.inc() ) ] = 'Totals'
     for stmt in statements:
       sheet[ str( cursor.inc() ) ] = str( stmt.account )
+
+    sheet[ str( cursor.inc() ) ] = 'Debt Change'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Is Debt], "*TRUE*" )'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Is Debt], "*TRUE*", {tx_table_name}[Account], "*{str(stmt.account)}*")'
     
     sheet[ str( cursor.inc() ) ] = 'Expenses'
-    sheet[ str( cursor.inc() ) ] = f'=-SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Matched Transfer], "*FALSE*")'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Matched Transfer], "*FALSE*")'
     for stmt in statements:
-      sheet[ str( cursor.inc() ) ] = f'=-SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Account], "*{str(stmt.account)}*")'
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], "<0", {tx_table_name}[Account], "*{str(stmt.account)}*", {tx_table_name}[Matched Transfer], "*FALSE*")'
 
     sheet[ str( cursor.inc() ) ] = 'Total Revenue'
-    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Matched Transfer], "*FALSE*")'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Matched Transfer], "*FALSE*" )'
     for stmt in statements:
-      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Account], "*{str(stmt.account)}*")'
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Amount], ">0", {tx_table_name}[Account], "*{str(stmt.account)}*" )'
 
     sheet[ str( cursor.inc() ) ] = 'Cash Flow'
-    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Matched Transfer], "*FALSE*", {tx_table_name}[Category], "<>*Loans*" )'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Matched Transfer], "*FALSE*", {tx_table_name}[Is Debt], "*FALSE*" )'
     for stmt in statements:
-      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Account], "*{str(stmt.account)}*")'
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Account], "*{str(stmt.account)}*", {tx_table_name}[Is Debt], "*FALSE*")'
+
+    sheet[ str( cursor.inc() ) ] = 'Net Change'
+    sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Matched Transfer], "*FALSE*" )'
+    for stmt in statements:
+      sheet[ str( cursor.inc() ) ] = f'=SUMIFS({tx_table_name}[Amount], {tx_table_name}[Account], "*{str(stmt.account)}*" )'
 
     for cat in categorizer.categories:
       sheet[ str( cursor.inc() ) ] = cat
